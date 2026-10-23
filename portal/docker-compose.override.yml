@@ -1,0 +1,84 @@
+# TP4: acrescenta ao compose de TP2/TP3 o serviço de ingestão e o gerador de carga.
+#
+# Copiar para a raiz do repositório, ao lado do docker-compose.yml. O
+# `docker compose` junta os dois ficheiros sozinho; não é preciso -f.
+# (Se o vosso ficheiro se chama compose.yaml, chamar a este compose.override.yaml.)
+services:
+
+  # 1. Serviço novo: o broker. A consola de gestão fica em localhost:15672.
+  broker:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: sivit
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-devpass}
+    ports: ["${PORTA_BROKER:-15672}:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
+  portal:
+    environment:
+      # Latência artificial, para a falha em cascata do exercício 3.
+      # Precisa do middleware de portal/vigilancia/middleware.py.
+      LATENCIA_MS: ${LATENCIA_MS:-0}
+
+  ingestao:
+    build: ./ingestao            # o vosso Dockerfile e o vosso main.py
+    environment:
+      DATABASE_URL: postgres://sivit:${POSTGRES_PASSWORD:-devpass}@sivitDB:5432/sivit
+      PORTAL: http://portal:8000
+      PORTAL_TOKEN: ${PORTAL_TOKEN:-}
+      AMQP_URL: amqp://sivit:${RABBITMQ_PASSWORD:-devpass}@broker:5672/
+      POR_FILA: ${POR_FILA:-1}
+      CONFIRMS: ${CONFIRMS:-1}
+      # Sugestão para o exercício 3: um interruptor por padrão, para medir
+      # cada um isoladamente. off | sincrona | timeout | retry | disjuntor | cache
+      MODO_VALIDACAO: ${MODO_VALIDACAO:-off}
+    depends_on:
+      sivitDB: { condition: service_healthy }
+      broker: { condition: service_healthy }
+    ports: ["${PORTA_INGESTAO:-8001}:8001"]
+
+  # Gerador de carga: só corre quando chamado, e termina no fim da medição.
+  #   docker compose run --rm carga http://ingestao:8001/teste/assincrono --concorrencia 50 --duracao 10
+  carga:
+    build: ./ferramentas
+    profiles: [ferramentas]
+  
+  # Os consumidores: uma imagem (./workers), um script cada. O código é
+  #    vosso. As variáveis são os botões das experiências: o vosso código
+  #    deve lê-las (ver o README), para se mudar o comportamento com
+  #      PREFETCH=1 TRABALHO_MS=20 docker compose up -d worker_alarmes
+  worker_arquivo:
+    build: ./workers
+    command: python arquivo.py
+    environment: &ambiente_worker
+      AMQP_URL: amqp://sivit:${RABBITMQ_PASSWORD:-devpass}@broker:5672/
+      DATABASE_URL: postgres://sivit:${POSTGRES_PASSWORD:-devpass}@sivitDB:5432/sivit
+      PREFETCH: ${PREFETCH:-10}
+      ACK_AUTOMATICO: ${ACK_AUTOMATICO:-0}
+      TRABALHO_MS: ${TRABALHO_MS:-0}
+      SEM_ON_CONFLICT: ${SEM_ON_CONFLICT:-0}
+      MORRER_APOS: ${MORRER_APOS:-0}
+      MORRER_ANTES_DO_ACK: ${MORRER_ANTES_DO_ACK:-0}
+      MAX_MENSAGENS: ${MAX_MENSAGENS:-100000}
+      POLITICA_CHEIA: ${POLITICA_CHEIA:-reject-publish}
+    depends_on:
+      broker: { condition: service_healthy }
+      sivitDB: { condition: service_healthy }
+
+  worker_alarmes:
+    build: ./workers
+    command: python alarmes.py
+    environment: *ambiente_worker
+    depends_on:
+      broker: { condition: service_healthy }
+
+  worker_painel:
+    build: ./workers
+    command: python painel.py
+    environment: *ambiente_worker
+    depends_on:
+      broker: { condition: service_healthy }
+
