@@ -1,0 +1,66 @@
+﻿
+simulador-1  | 2026-10-26T11:38:48.393861134Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:38:48.395163002Z [BUFFER] Lote guardado em disco. 1 por enviar.
+simulador-1  | 2026-10-26T11:38:53.393507056Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:38:53.393952564Z [BUFFER] Serviço ainda em baixo. 2 por enviar.
+simulador-1  | 2026-10-26T11:38:58.388000299Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:38:58.388894743Z [BUFFER] Serviço ainda em baixo. 3 por enviar.
+simulador-1  | 2026-10-26T11:39:03.384667232Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:03.385427624Z [BUFFER] Serviço ainda em baixo. 4 por enviar.
+simulador-1  | 2026-10-26T11:39:08.364123025Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:08.365438036Z [BUFFER] Serviço ainda em baixo. 5 por enviar.
+simulador-1  | 2026-10-26T11:39:13.364117939Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:13.364834996Z [BUFFER] Serviço ainda em baixo. 6 por enviar.
+simulador-1  | 2026-10-26T11:39:18.314355039Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:18.315074546Z [BUFFER] Serviço ainda em baixo. 7 por enviar.
+simulador-1  | 2026-10-26T11:39:23.304962012Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:23.305759610Z [BUFFER] Serviço ainda em baixo. 8 por enviar.
+simulador-1  | 2026-10-26T11:39:28.280177788Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:28.281856504Z [BUFFER] Serviço ainda em baixo. 9 por enviar.
+simulador-1  | 2026-10-26T11:39:33.259373068Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:33.260777325Z [BUFFER] Serviço ainda em baixo. 10 por enviar.
+simulador-1  | 2026-10-26T11:39:38.251896588Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:38.254549072Z [BUFFER] Serviço ainda em baixo. 11 por enviar.
+simulador-1  | 2026-10-26T11:39:43.255163300Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:43.256658922Z [BUFFER] Serviço ainda em baixo. 12 por enviar.
+simulador-1  | 2026-10-26T11:39:48.261991242Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:48.263520175Z [BUFFER] Serviço ainda em baixo. 13 por enviar.
+simulador-1  | 2026-10-26T11:39:53.268281801Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:53.272760049Z [BUFFER] Serviço ainda em baixo. 14 por enviar.
+simulador-1  | 2026-10-26T11:39:58.239857860Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:39:58.241627840Z [BUFFER] Serviço ainda em baixo. 15 por enviar.
+simulador-1  | 2026-10-26T11:40:03.241141328Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:40:03.244863410Z [BUFFER] Serviço ainda em baixo. 16 por enviar.
+simulador-1  | 2026-10-26T11:40:08.241988576Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:40:08.243064636Z [BUFFER] Serviço ainda em baixo. 17 por enviar.
+simulador-1  | 2026-10-26T11:40:13.226797234Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:40:13.228046783Z [BUFFER] Serviço ainda em baixo. 18 por enviar.
+simulador-1  | 2026-10-26T11:40:18.204957827Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:40:18.207245548Z [BUFFER] Serviço ainda em baixo. 19 por enviar.
+simulador-1  | 2026-10-26T11:40:19.210396506Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:40:19.211857065Z [BUFFER] Serviço ainda em baixo. 20 por enviar.
+simulador-1  | 2026-10-26T11:40:20.215215249Z [ERRO] Ingestão indisponível (ConnectError).
+simulador-1  | 2026-10-26T11:40:20.216509197Z [BUFFER] Serviço ainda em baixo. 21 por enviar.
+simulador-1  | 2026-10-26T11:40:21.360191299Z [REPLAY] Lote antigo enviado. Restam 20 no buffer.
+simulador-1  | 2026-10-26T11:40:22.604057423Z [REPLAY] Lote antigo enviado. Restam 19 no buffer.
+simulador-1  | 2026-10-26T11:40:23.819665796Z [REPLAY] Lote antigo enviado. Restam 18 no buffer.
+simulador-1  | 2026-10-26T11:40:25.020393671Z [REPLAY] Lote antigo enviado. Restam 17 no buffer.
+simulador-1  | 2026-10-26T11:40:26.237028642Z [REPLAY] Lote antigo enviado. Restam 16 no buffer.
+simulador-1  | 2026-10-26T11:40:27.448647117Z [REPLAY] Lote antigo enviado. Restam 15 no buffer.
+simulador-1  | 2026-10-26T11:40:28.684946220Z [REPLAY] Lote antigo enviado. Restam 14 no buffer.
+simulador-1  | 2026-10-26T11:40:29.928972481Z [REPLAY] Lote antigo enviado. Restam 13 no buffer.
+simulador-1  | 2026-10-26T11:40:31.176997741Z [REPLAY] Lote antigo enviado. Restam 12 no buffer.
+simulador-1  | 2026-10-26T11:40:32.390831527Z [REPLAY] Lote antigo enviado. Restam 11 no buffer.
+simulador-1  | 2026-10-26T11:40:33.611540194Z [REPLAY] Lote antigo enviado. Restam 10 no buffer.
+simulador-1  | 2026-10-26T11:40:34.844114934Z [REPLAY] Lote antigo enviado. Restam 9 no buffer.
+simulador-1  | 2026-10-26T11:40:36.101297382Z [REPLAY] Lote antigo enviado. Restam 8 no buffer.
+simulador-1  | 2026-10-26T11:40:37.341294502Z [REPLAY] Lote antigo enviado. Restam 7 no buffer.
+simulador-1  | 2026-10-26T11:40:38.559300865Z [REPLAY] Lote antigo enviado. Restam 6 no buffer.
+simulador-1  | 2026-10-26T11:40:39.776108270Z [REPLAY] Lote antigo enviado. Restam 5 no buffer.
+simulador-1  | 2026-10-26T11:40:40.987346402Z [REPLAY] Lote antigo enviado. Restam 4 no buffer.
+simulador-1  | 2026-10-26T11:40:42.196473611Z [REPLAY] Lote antigo enviado. Restam 3 no buffer.
+simulador-1  | 2026-10-26T11:40:43.417904923Z [REPLAY] Lote antigo enviado. Restam 2 no buffer.
+simulador-1  | 2026-10-26T11:40:44.641923761Z [REPLAY] Lote antigo enviado. Restam 1 no buffer.
+simulador-1  | 2026-10-26T11:40:45.849370120Z [REPLAY] Lote antigo enviado. Restam 0 no buffer.
+
+

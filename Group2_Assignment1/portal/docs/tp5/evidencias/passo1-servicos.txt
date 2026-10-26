@@ -1,0 +1,9 @@
+﻿NAME                      IMAGE                                                                     COMMAND                  SERVICE          CREATED             STATUS                       PORTS
+portal-broker-1           rabbitmq:3.13-management                                                  "docker-entrypoint.s…"   broker           About an hour ago   Up About an hour (healthy)   0.0.0.0:15672->15672/tcp, [::]:15672->15672/tcp
+portal-ingestao-1         sha256:9099fcfc519c4d42f6bc65c5ef2c7fe60f9bbd081fefe2102c5af68c68a3c14a   "uvicorn main:app --…"   ingestao         59 minutes ago      Up 10 minutes                0.0.0.0:8001->8001/tcp, [::]:8001->8001/tcp
+portal-portal-1           portal-portal                                                             "./arranque.sh"          portal           18 minutes ago      Up 18 minutes                0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+portal-simulador-1        portal-simulador                                                          "python simulador.py…"   simulador        15 minutes ago      Up 15 minutes                
+portal-sivitDB-1          postgres:16-alpine                                                        "docker-entrypoint.s…"   sivitDB          About an hour ago   Up About an hour (healthy)   5432/tcp
+portal-worker_alarmes-1   sha256:16915134fe039ee6d9e168245832dd730c7b0c9f0c500dc5b7fe65b11e618d53   "python alarmes.py"      worker_alarmes   About an hour ago   Up About an hour             
+portal-worker_arquivo-1   sha256:7ee6928ce34b775389e66d3c45a03d16dca9bddaf33275e72e8ac8e28317ca95   "python arquivo.py"      worker_arquivo   About an hour ago   Up About an hour             
+portal-worker_painel-1    sha256:2564f44bde4c578e4915598c21c9242eaf09ba8c82742d12232cb24acac6d47e   "python painel.py"       worker_painel    About an hour ago   Up About an hour             

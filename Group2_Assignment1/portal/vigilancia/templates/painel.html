@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block titulo %}Painel de Vigilância Ativo{% endblock %}
+
+{% block cabecalho %}Painel de Vigilância Ativo{% endblock %}
+
+{% block conteudo %}
+<style>
+    .painel-clinico {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #1e293b;
+    }
+
+    .barra-filtros {
+        background: #ffffff;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        margin-bottom: 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        border: 1px solid #e2e8f0;
+    }
+
+    /* Grelha responsiva de cartões para os doentes */
+    .grelha-doentes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 20px;
+    }
+
+    /* Cartão individual que agrupa todas as leituras do mesmo doente */
+    .cartao-doente {
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .cartao-doente:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    }
+
+    .cartao-cabecalho {
+        background: #f8fafc;
+        padding: 15px 20px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .nome-paciente {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .cartao-corpo {
+        padding: 15px 20px;
+    }
+
+    .item-dispositivo {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .item-dispositivo:last-child {
+        border-bottom: none;
+    }
+
+    .badge-dispositivo {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 4px;
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    .valor-leitura {
+        font-family: monospace;
+        font-size: 13px;
+        color: #334155;
+        font-weight: 600;
+    }
+
+    .links-orm a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+        margin-left: 5px;
+    }
+    .links-orm a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="painel-clinico">
+    <!-- Barra informativa com o seletor de otimização ORM do Exercício 4 -->
+    <div class="barra-filtros">
+        <div>
+            <span style="font-size: 14px; color: #64748b;">Modo da consulta ORM:</span>
+            <strong style="color: #0f172a;">{{ modo }}</strong>
+        </div>
+        <div class="links-orm">
+            <span style="font-size: 13px; color: #64748b;">Alternar modo:</span>
+            <a href="?modo=ingenuo">ingenuo</a> |
+            <a href="?modo=select">select</a> |
+            <a href="?modo=prefetch">prefetch</a> |
+            <a href="?modo=subquery">subquery</a>
+        </div>
+    </div>
+
+    <!-- Grelha dinâmica gerada iterando sobre todos os doentes da base de dados -->
+    <div class="grelha-doentes">
+        {% for doente, dispositivos in doentes_agrupados.items %}
+          <div class="cartao-doente">
+              <div class="cartao-cabecalho">
+                  <h3 class="nome-paciente">{{ doente }}</h3>
+                  <span style="font-size: 11px; color: #16a34a; font-weight: 600;">● Em Vigilância</span>
+              </div>
+              <div class="cartao-corpo">
+                  {% for item in dispositivos %}
+                  <div class="item-dispositivo">
+                      <span class="badge-dispositivo">{{ item.tipo }}</span>
+                      <span class="valor-leitura">{{ item.leitura }}</span>
+                  </div>
+                  {% endfor %}
+              </div>
+          </div>
+        {% empty %}
+          <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b; background: #ffffff; border-radius: 10px; border: 1px solid #e2e8f0;">
+              ⚠️ Sem internamentos ativos. Corre <code>manage.py seed_sivit</code> no terminal.
+          </div>
+        {% endfor %}
+    </div>
+
+    <!-- Rodapé informativo com a contagem total de doentes -->
+    <p style="margin-top: 25px; font-size: 13px; color: #64748b; text-align: right;">
+        Total de doentes monitorizados em tempo real: <strong>{{ total_doentes|default:0 }}</strong>
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+==================================================
+EVIDÊNCIA: TESTE DE CARGA E FILAS RABBITMQ (TP4 / TP5)
+==================================================
+
+1. Resultado do Teste de Carga na Ingestão:
+- Pedidos HTTP aceites (202 Accepted): 92 / 92 (0 erros, 0 falhas)
+- Leituras enviadas: 920
+- Leituras confirmadas: 920
+- Leituras perdidas: 0
+- Métricas de Latência:
+  * Média: 543.75 ms
+  * p50: 516.61 ms
+  * p95: 915.26 ms
+  * p99: 1163.56 ms
+
+JSON Bruto do Teste:
+{"pedidos": 92, "debito_req_s": 9.0, "ok": 92, "erros_http": 0, "falhas": 0, "media_ms": 543.75, "p50_ms": 516.61, "p95_ms": 915.26, "p99_ms": 1163.56, "por_codigo": {}, "leituras_enviadas": 920, "leituras_confirmadas": 920, "leituras_perdidas": 0}
+
+2. Estado das Filas do RabbitMQ (após consumo pelos Workers):
+name     messages    messages_ready  consumers
+display  0           0               1
+alarms   0           0               1
+arquivo  0           0               1
+alarms.dlq   0       0               0
+arquivo.dlq  0       0               0
+display.dlq  0       0               0

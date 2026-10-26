@@ -1,0 +1,16 @@
+[
+  {
+    "dispositivo": "SN-0001-0",
+    "instante": "2026-10-14T12:00:00Z",
+    "parametro": "FC",
+    "valor": 75,
+    "unidade": "bpm"
+  },
+  {
+    "dispositivo": "SN-0001-1",
+    "instante": "2026-10-14T12:01:00Z",
+    "parametro": "SPO2",
+    "valor": 98,
+    "unidade": "%"
+  }
+]
