@@ -3,12 +3,16 @@
 A versão é escolhida por ?modo=..., para que a mesma página possa ser medida
 lado a lado:  /painel/?modo=ingenuo  ...  /painel/?modo=subquery
 """
-from collections import defaultdict
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db.models import OuterRef, Prefetch, Subquery
-from django.http import JsonResponse
-from django.shortcuts import render
+from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
-from .models import Doente, Dispositivo, Internamento, Leitura
+from . import services
+from .models import Alarme, Dispositivo, Internamento, Leitura, Perfil
 
 
 def _linhas_ingenuo():
