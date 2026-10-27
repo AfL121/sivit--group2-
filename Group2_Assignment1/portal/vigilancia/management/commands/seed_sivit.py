@@ -7,6 +7,10 @@ Sem volume de dados, o exercício do N+1 não impressiona. Por omissão:
   python manage.py seed_sivit --leituras 200000 --limpar
 """
 import random
+import os
+
+from django.contrib.auth import get_user_model
+from vigilancia.models import Alarme, Perfil
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
