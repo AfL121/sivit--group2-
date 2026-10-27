@@ -7,6 +7,7 @@ Substitui o `hey` ou o `wrk`: evita instalações e mede exatamente o que
 interessa para as tabelas do guião, incluindo leituras perdidas.
 """
 import argparse
+import os
 import asyncio
 import json
 import random
@@ -75,7 +76,8 @@ async def principal(args):
     estado = {"ok": 0, "erros": 0, "falhas": 0, "amostras": [], "contador": 0,
               "leituras_confirmadas": 0, "por_codigo": {}}
     limites = httpx.Limits(max_connections=args.concorrencia * 2)
-    async with httpx.AsyncClient(timeout=args.timeout, limits=limites) as cliente:
+      headers = {"Authorization": f"Token {os.environ['INGESTAO_TOKEN']}"} if os.environ.get("INGESTAO_TOKEN") else {}
+      async with httpx.AsyncClient(timeout=args.timeout, limits=limites, headers=headers) as cliente:
         inicio = time.monotonic()
         fim = inicio + args.duracao
         await asyncio.gather(*(trabalhador(cliente, args, estado, fim)
