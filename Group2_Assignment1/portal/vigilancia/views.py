@@ -86,23 +86,49 @@ MODOS = {
 }
 
 
+@login_required
 def painel(request):
-    modo = request.GET.get("modo", "subquery")
-    linhas = MODOS.get(modo, _linhas_subquery)()
-    
-    # Agrupa dinamicamente por nome real do doente para o novo painel em cartões
-    doentes_agrupados = defaultdict(list)
-    for nome_doente, tipo_disp, resumo_leitura in linhas:
-        doentes_agrupados[nome_doente].append({
-            "tipo": tipo_disp,
-            "leitura": resumo_leitura
-        })
-
+    internamentos = list(services.painel_dados(request.user))
+    services.auditar(request.user, "VER_PAINEL", request.path,
+                     services.ip_do_pedido(request),
+                     [i.doente.codigo for i in internamentos])
     return render(request, "painel.html", {
-        "doentes_agrupados": dict(doentes_agrupados),
-        "modo": modo,
-        "total_doentes": len(doentes_agrupados)
+        "internamentos": internamentos,
+        "pode_reconhecer": services.papel(request.user) == Perfil.ENFERMEIRO,
     })
+
+
+@login_required
+def doente_detalhe(request, internamento_id):
+    internamento = get_object_or_404(
+        Internamento.objects.select_related("doente"), pk=internamento_id)
+    if not services.pode_ver_enfermaria(request.user, internamento.enfermaria):
+        raise PermissionDenied
+    services.auditar(request.user, "VER_DOENTE", request.path,
+                     services.ip_do_pedido(request), [internamento.doente.codigo])
+    leituras = (Leitura.objects.filter(dispositivo__internamento=internamento)
+                .select_related("dispositivo").order_by("-instante")[:30])
+    alarmes = (internamento.alarmes.select_related("reconhecido_por", "dispositivo")
+               .order_by("-criado_em")[:20])
+    return render(request, "doente.html", {
+        "internamento": internamento, "leituras": leituras, "alarmes": alarmes})
+
+
+@login_required
+@require_POST
+def reconhecer_alarme(request, alarme_id):
+    try:
+        alarme, novo = services.reconhecer_alarme(
+            alarme_id, request.user, ip=services.ip_do_pedido(request))
+    except Alarme.DoesNotExist:
+        raise Http404
+    except services.AlarmeJaReconhecido as e:
+        quem = getattr(e.por, "username", "outro profissional")
+        messages.error(request, f"Este alarme já foi reconhecido por {quem}.")
+    else:
+        messages.success(request, "Alarme reconhecido." if novo
+                         else "Já tinha reconhecido este alarme.")
+    return redirect("painel")
 
 
 def saude(request):
