@@ -11,6 +11,7 @@ import httpx
 #   BUFFER_FILE=/dados/buffer_leituras.json   (num volume, para sobreviver a reinícios)
 BUFFER_FILE = os.environ.get("BUFFER_FILE", "buffer_leituras.json")
 URL_POR_OMISSAO = os.environ.get("INGESTAO_URL", "http://localhost:8001/v1/leituras")
+TOKEN = os.environ.get("INGESTAO_TOKEN", "")
 
 
 def gerar_leitura(n_dispositivos):
@@ -97,7 +98,7 @@ async def main(args):
         print(f"[*] Encontrados {len(buffer)} lotes em buffer local por enviar.")
 
     ciclo = 0
-    async with httpx.AsyncClient(timeout=5.0) as cliente:
+    async with httpx.AsyncClient(timeout=5.0, headers={"Authorization": f"Token {TOKEN}"}) as cliente:
         while args.ciclos == 0 or ciclo < args.ciclos:
             ciclo += 1
             lote = [gerar_leitura(args.dispositivos) for _ in range(args.lote)]
