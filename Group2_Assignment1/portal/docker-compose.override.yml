@@ -25,7 +25,7 @@ services:
       # Resposta perdida (TP3-E2): 0 = desligado. Ex.: DROP_RESPONSE_PROB=0.3
       DROP_RESPONSE_PROB: ${DROP_RESPONSE_PROB:-0}
 
-    ingestao:
+  ingestao:
     build: ./ingestao
     environment:
       DATABASE_URL: postgres://sivit:${POSTGRES_PASSWORD:-devpass}@sivitDB:5432/sivit
@@ -53,8 +53,10 @@ services:
     command: ["http://ingestao:8001/v1/leituras", "--dispositivos", "20", "--lote", "10", "--intervalo", "1"]
     environment:
       BUFFER_FILE: /dados/buffer_leituras.json
+      INGESTAO_TOKEN: ${GATEWAY_TOKEN:-dev-gateway-token}
     volumes: [simulador_buffer:/dados]
     profiles: [ferramentas]
+    
 
 
   # Gerador de carga: só corre quando chamado, e termina no fim da medição.
@@ -62,6 +64,8 @@ services:
   carga:
     build: ./ferramentas
     profiles: [ferramentas]
+    environment:
+      INGESTAO_TOKEN: ${GATEWAY_TOKEN:-dev-gateway-token}
   
   # Os consumidores: uma imagem (./workers), um script cada. O código é
   #    vosso. As variáveis são os botões das experiências: o vosso código
