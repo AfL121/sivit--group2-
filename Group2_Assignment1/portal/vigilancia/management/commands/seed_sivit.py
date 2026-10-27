@@ -44,6 +44,37 @@ class Command(BaseCommand):
         parser.add_argument("--leituras", type=int, default=50_000)
         parser.add_argument("--limpar", action="store_true")
 
+    def _criar_utilizadores(self):
+        """medico1; enf1a/enf1b ... enf4a/enf4b (dois enfermeiros por enfermaria,
+        para demonstrar a exclusão mútua no reconhecimento)."""
+        User = get_user_model()
+        senha = os.environ.get("DEMO_PASSWORD", "sivit-demo")
+        contas = [("medico1", Perfil.MEDICO, "")]
+        for k in range(1, 5):
+            for s in "ab":
+                contas.append((f"enf{k}{s}", Perfil.ENFERMEIRO, f"ENF{k}"))
+        for username, papel, enfermaria in contas:
+            u, criado = User.objects.get_or_create(username=username)
+            if criado:
+                u.set_password(senha)
+                u.save()
+            Perfil.objects.update_or_create(
+                utilizador=u, defaults={"papel": papel, "enfermaria": enfermaria})
+
+    def _criar_alarmes_demo(self):
+        """Um alarme por enfermaria, para testar o painel antes de existir o detetor.
+        A chave única torna a repetição do seed inofensiva."""
+        dispositivos = (Dispositivo.objects.using("default")
+                        .select_related("internamento")
+                        .filter(internamento__isnull=False, tipo="SpO2")
+                        .order_by("numero_serie")[:4])
+        for d in dispositivos:
+            Alarme.objects.get_or_create(
+                chave=f"demo|{d.numero_serie}",
+                defaults=dict(dispositivo=d, internamento=d.internamento,
+                              regra="SPO2_BAIXA", parametro="SPO2", valor=87.0,
+                              mensagem="SpO₂ < 90 % (demonstração)"))
+
     def handle(self, *args, **o):
         if o["limpar"]:
             Leitura.objects.all().delete()
