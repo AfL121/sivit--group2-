@@ -25,18 +25,18 @@ services:
       # Resposta perdida (TP3-E2): 0 = desligado. Ex.: DROP_RESPONSE_PROB=0.3
       DROP_RESPONSE_PROB: ${DROP_RESPONSE_PROB:-0}
 
-  ingestao:
-    build: ./ingestao            # o vosso Dockerfile e o vosso main.py
+    ingestao:
+    build: ./ingestao
     environment:
       DATABASE_URL: postgres://sivit:${POSTGRES_PASSWORD:-devpass}@sivitDB:5432/sivit
-      PORTAL: http://portal:8000
-      PORTAL_TOKEN: ${PORTAL_TOKEN:-}
+      PORTAL_URL: http://portal:8000
+      PORTAL_TOKEN: ${PORTAL_TOKEN:-dev-portal-token}
+      GATEWAY_TOKENS: ${GATEWAY_TOKEN:-dev-gateway-token}
       AMQP_URL: amqp://sivit:${RABBITMQ_PASSWORD:-devpass}@broker:5672/
       POR_FILA: ${POR_FILA:-1}
       CONFIRMS: ${CONFIRMS:-1}
-      # Sugestão para o exercício 3: um interruptor por padrão, para medir
-      # cada um isoladamente. off | sincrona | timeout | retry | disjuntor | cache
-      MODO_VALIDACAO: ${MODO_VALIDACAO:-off}
+      # off | sincrona | timeout | retry | disjuntor | cache (cumulativos)
+      MODO_VALIDACAO: ${MODO_VALIDACAO:-cache}
     depends_on:
       sivitDB: { condition: service_healthy }
       broker: { condition: service_healthy }
