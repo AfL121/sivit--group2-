@@ -112,6 +112,9 @@ class Command(BaseCommand):
         if lote:
             Leitura.objects.bulk_create(lote, ignore_conflicts=True)
 
+        self._criar_utilizadores()
+        self._criar_alarmes_demo()
+
         self.stdout.write(self.style.SUCCESS(
             f"doentes={Doente.objects.using('default').count()} "
             f"internamentos={Internamento.objects.using('default').count()} "
