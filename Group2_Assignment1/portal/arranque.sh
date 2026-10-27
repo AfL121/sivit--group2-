@@ -36,6 +36,7 @@ esperar_bd 60
 # As migrações vivem no Git (vigilancia/migrations/). Gerá-las aqui, no arranque,
 # criava ficheiros dentro do contentor que ninguém revê e que divergem entre réplicas.
 python manage.py migrate --noinput
+python manage.py criar_token_servico
 python manage.py collectstatic --noinput >/dev/null
 
 if [[ "${DJANGO_RUNSERVER:-0}" == "1" ]]; then
