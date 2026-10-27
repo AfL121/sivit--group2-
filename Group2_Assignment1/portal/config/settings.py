@@ -93,6 +93,9 @@ LANGUAGE_CODE = "pt-pt"
 TIME_ZONE = "Europe/Lisbon"
 USE_I18N = True
 USE_TZ = True
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/painel/"
+LOGOUT_REDIRECT_URL = "/login/"
 
 STATIC_URL = "/static/"
 STATIC_ROOT = "/var/www/static"
