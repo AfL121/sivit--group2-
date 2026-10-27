@@ -1,14 +1,48 @@
-import json
 import asyncio
-import time
-from datetime import datetime, timezone
-from contextlib import asynccontextmanager
-import asyncpg
-import aio_pika
+import hmac
+import json
+import logging
 import os
+import random
+import time
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
+import aio_pika
+import asyncpg
 import httpx
-from fastapi import FastAPI, Response, status, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from pydantic import BaseModel
+
+logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
+log = logging.getLogger("ingestao")
+
+# ------------------------------------------------------------------ configuração (RNF3)
+PORTAL_URL = os.environ.get("PORTAL_URL", "http://portal:8000")
+PORTAL_TOKEN = os.environ.get("PORTAL_TOKEN", "")
+GATEWAY_TOKENS = {t.strip() for t in os.environ.get("GATEWAY_TOKENS", "").split(",") if t.strip()}
+POR_FILA = int(os.environ.get("POR_FILA", 1))
+
+# Níveis cumulativos, na ordem da tabela do TP4:
+# off < sincrona < timeout < retry < disjuntor < cache
+MODOS = ["off", "sincrona", "timeout", "retry", "disjuntor", "cache"]
+MODO = os.environ.get("MODO_VALIDACAO", "cache")
+if MODO not in MODOS:
+    raise RuntimeError(f"MODO_VALIDACAO inválido: {MODO} (usar {MODOS})")
+NIVEL = MODOS.index(MODO)
+
+TIMEOUT_S = float(os.environ.get("PORTAL_TIMEOUT_S", "0.5"))
+CB_FALHAS = int(os.environ.get("CB_FALHAS", "5"))      # falhas seguidas para abrir
+CB_PAUSA_S = float(os.environ.get("CB_PAUSA_S", "10"))  # tempo de circuito aberto
+CACHE_TTL_S = float(os.environ.get("CACHE_TTL_S", "60"))
+
+# Cópia dos limites do portal (services.LIMITES_PLAUSIVEIS): a ingestão é outro
+# serviço e não pode importar código Django. Manter os dois sincronizados.
+LIMITES = {
+    "FC": (20, 250), "SPO2": (50, 100), "TEMP": (30, 45),
+    "PAS": (40, 260), "PAD": (20, 160), "FR": (4, 60),
+}
+
 
 class Reading(BaseModel):
     dispositivo: str
@@ -17,138 +51,188 @@ class Reading(BaseModel):
     valor: float
     unidade: str
 
-PORTAL_URL = "http://portal:8000"
 
-falhas_consecutivas = 0
-MAX_FALHAS = 3
-ABERTO_ATE = 0
-cache_dispositivos = {}
-TTL_CACHE = 60.0
-
-async def validate_device(serial: str) -> bool:
-    global falhas_consecutivas, ABERTO_ATE, cache_dispositivos
-    agora = time.time()
-    
-    if serial in cache_dispositivos and cache_dispositivos[serial] > agora:
-        return True
-    if agora < ABERTO_ATE:
-        return True
-        
-    try:
-        async with httpx.AsyncClient(timeout=0.5) as cli:
-            r = await cli.get(f"{PORTAL_URL}/api/v1/devices/{serial}/")
-            falhas_consecutivas = 0 
-            valido = r.status_code == 200 and r.json().get("admission") is not None
-            if valido:
-                cache_dispositivos[serial] = agora + TTL_CACHE
-            return valido
-    except Exception:
-        falhas_consecutivas += 1
-        if falhas_consecutivas >= MAX_FALHAS:
-            ABERTO_ATE = agora + 10.0
-        return True
-
+# ------------------------------------------------------------------ estado
 pool = None
 broker_conn = None
 exchange = None
+cliente_portal = None
+
+_falhas = 0
+_aberto_ate = 0.0
+_cache: dict[str, float] = {}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pool, broker_conn, exchange
-    
-    # 1. Ligação BD (Mantida para testes POR_FILA=0)
-    db_url = os.getenv("DATABASE_URL", "postgresql://sivit:sivit@sivitDB:5432/sivit")
-    pool = await asyncpg.create_pool(db_url)
-    
-    # 2. Ligação RabbitMQ (TP5)
-    amqp_url = os.environ.get("AMQP_URL", "amqp://sivit:devpass@broker:5672/")
-    broker_conn = await aio_pika.connect_robust(amqp_url)
-    # Exercício 1: Ativar/Desativar publisher confirms na criação do canal
+    global pool, broker_conn, exchange, cliente_portal
+    if not GATEWAY_TOKENS:
+        log.warning("GATEWAY_TOKENS vazio: todos os pedidos serão recusados (401)")
+    log.info("modo de validação: %s", MODO)
+
+    pool = await asyncpg.create_pool(os.environ["DATABASE_URL"])
+    broker_conn = await aio_pika.connect_robust(os.environ["AMQP_URL"])
     usa_confirms = bool(int(os.environ.get("CONFIRMS", 1)))
     channel = await broker_conn.channel(publisher_confirms=usa_confirms)
-        
-    # Declarar o tópico 'leituras' durável
     exchange = await channel.declare_exchange("leituras", aio_pika.ExchangeType.TOPIC, durable=True)
-    
+
+    cliente_portal = httpx.AsyncClient(
+        base_url=PORTAL_URL,
+        headers={"Authorization": f"Token {PORTAL_TOKEN}"},
+        # nível "sincrona" = SEM timeout, para reproduzir a falha em cascata
+        timeout=None if NIVEL == 1 else TIMEOUT_S,
+    )
     yield
-    
+    await cliente_portal.aclose()
     await pool.close()
     await broker_conn.close()
 
+
 app = FastAPI(lifespan=lifespan)
 
-# Função nova que encapsula a lógica de formatação e publicação
-async def publish(r: Reading):
+
+# ------------------------------------------------------------------ autenticação do gateway (RF2)
+def autenticar(authorization: str | None = Header(default=None)):
+    esquema, _, token = (authorization or "").partition(" ")
+    ok = esquema.lower() == "token" and any(
+        hmac.compare_digest(token.encode(), t.encode()) for t in GATEWAY_TOKENS)
+    if not ok:
+        raise HTTPException(401, "token de gateway inválido ou em falta",
+                            headers={"WWW-Authenticate": "Token"})
+
+
+# ------------------------------------------------------------------ validação do dispositivo (TP4-E3)
+async def _consultar_portal(serial: str) -> bool:
+    """Uma tentativa. True/False = resposta definitiva; exceção = portal indisponível."""
+    r = await cliente_portal.get(f"/api/v1/devices/{serial}/")
+    if r.status_code == 404:
+        return False
+    r.raise_for_status()
+    return r.json().get("admission") is not None
+
+
+def _registar_falha():
+    global _falhas, _aberto_ate
+    _falhas += 1
+    if NIVEL >= 4 and _falhas >= CB_FALHAS:
+        _aberto_ate = time.monotonic() + CB_PAUSA_S   # após a pausa, a 1.ª falha reabre
+
+
+async def estado_dispositivo(serial: str):
+    """True = válido, False = inválido, None = não foi possível verificar."""
+    global _falhas
+    if NIVEL == 0:
+        return True
+    agora = time.monotonic()
+    if NIVEL >= 5 and _cache.get(serial, 0) > agora:
+        return True
+    if NIVEL >= 4 and agora < _aberto_ate:
+        return None                                   # circuito aberto: nem tenta
+
+    tentativas = 3 if NIVEL >= 3 else 1
+    for i in range(tentativas):
+        try:
+            valido = await _consultar_portal(serial)
+        except Exception as e:                        # noqa: BLE001
+            log.warning("portal indisponível (%s): %s", type(e).__name__, e)
+            _registar_falha()
+            if i + 1 < tentativas:
+                # backoff exponencial com jitter total: evita a "thundering herd"
+                await asyncio.sleep(random.uniform(0, 0.1 * 2 ** i))
+        else:
+            _falhas = 0
+            if valido and NIVEL >= 5:
+                _cache[serial] = time.monotonic() + CACHE_TTL_S
+            return valido
+    return None   # fail open: perder uma leitura clínica é pior do que aceitá-la sem validar
+
+
+def plausivel(r: Reading):
+    limites = LIMITES.get(r.parametro)
+    if limites is None:
+        return "parametro_desconhecido"
+    if not limites[0] <= r.valor <= limites[1]:     # também rejeita NaN
+        return "valor_implausivel"
+    return None
+
+
+# ------------------------------------------------------------------ publicação
+async def publish(r: Reading, nao_validado: bool = False):
     body = r.model_dump(mode="json")
-    # Regra TP5: adicionar _publicado_em em ISO 8601 com timezone
     body["_publicado_em"] = datetime.now(timezone.utc).isoformat()
-    
+    if nao_validado:
+        body["_nao_validado"] = True                  # para reconciliação posterior
     mensagem = aio_pika.Message(
         body=json.dumps(body).encode(),
         delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-        # Chave de desduplicação
-        message_id=f"{r.dispositivo}|{r.instante.isoformat()}|{r.parametro}"
+        message_id=f"{r.dispositivo}|{r.instante.isoformat()}|{r.parametro}",
     )
-    # Ex: leitura.fc.SN-0001
-    routing_key = f"leitura.{r.parametro.lower()}.{r.dispositivo}"
-    
-    await exchange.publish(mensagem, routing_key=routing_key)
+    await exchange.publish(mensagem, routing_key=f"leitura.{r.parametro.lower()}.{r.dispositivo}")
 
-@app.post("/v1/leituras", status_code=202)
+
+@app.post("/v1/leituras", status_code=202, dependencies=[Depends(autenticar)])
 async def ingest(batch: list[Reading]):
-    global pool
-    
+    if not batch:
+        return {"received": 0, "accepted": 0, "rejected": 0}
+
+    # uma verificação por dispositivo DISTINTO, em paralelo
+    series = list({r.dispositivo for r in batch})
+    estados = dict(zip(series, await asyncio.gather(*(estado_dispositivo(s) for s in series))))
+
+    aceites, rejeitadas = [], []
     for r in batch:
-        try:
-            await validate_device(r.dispositivo)
-        except Exception as e:
-            print(f"Erro ao ligar ao portal: {e}")
-            
-    # Lógica condicional imposta pelas variáveis de ambiente de TP5
-    por_fila = int(os.environ.get("POR_FILA", 1))
-    
-    if por_fila == 0:
-        # Comportamento antigo TP4 (para a coluna "Sem fila" do relatório)
-        rows = [(r.dispositivo, r.instante, r.parametro, r.valor, r.unidade) for r in batch]
+        motivo = plausivel(r)
+        if motivo is None and estados[r.dispositivo] is False:
+            motivo = "dispositivo_sem_internamento"
+        if motivo:
+            rejeitadas.append({"dispositivo": r.dispositivo,
+                               "instante": r.instante.isoformat(), "motivo": motivo})
+        else:
+            aceites.append((r, estados[r.dispositivo] is None))
+
+    if rejeitadas:
+        log.warning("%d leituras rejeitadas num lote de %d", len(rejeitadas), len(batch))
+    if not aceites:
+        raise HTTPException(422, detail={"rejected": rejeitadas[:20]})
+
+    if POR_FILA == 0:
+        rows = [(r.dispositivo, r.instante, r.parametro, r.valor, r.unidade) for r, _ in aceites]
         async with pool.acquire() as c:
             await c.executemany("""
-            INSERT INTO vigilancia_leitura
-            (dispositivo_id, instante, parametro, valor, unidade)
-            VALUES (
-                (SELECT id FROM vigilancia_dispositivo WHERE numero_serie = $1), 
-                $2, $3, $4, $5
-            )
-            ON CONFLICT (dispositivo_id, instante, parametro) DO NOTHING
+                INSERT INTO vigilancia_leitura (dispositivo_id, instante, parametro, valor, unidade)
+                VALUES ((SELECT id FROM vigilancia_dispositivo WHERE numero_serie = $1), $2, $3, $4, $5)
+                ON CONFLICT (dispositivo_id, instante, parametro) DO NOTHING
             """, rows)
     else:
-        # Novo comportamento TP5
         try:
-            await asyncio.gather(*(publish(r) for r in batch))
+            await asyncio.gather(*(publish(r, nv) for r, nv in aceites))
         except Exception:
-            # Ex. 4.1: SPOF do broker
             raise HTTPException(503, detail="broker indisponivel")
-            
-    return {"received": len(batch)}
 
+    return {"received": len(batch), "accepted": len(aceites),
+            "rejected": len(rejeitadas), "rejected_detail": rejeitadas[:20]}
+
+
+# ------------------------------------------------------------------ saúde (RF2)
+# vivo: o processo responde. Não depende de nada: se falhar, reinicia-se.
+@app.get("/saude/vivo")
 @app.get("/health/live")
 def live():
-    return {"status": "ok"}
+    return {"estado": "vivo"}
 
-# O guião testa a disponibilidade com /saude/pronto, adicionei a rota alias
+
+# pronto: consegue cumprir a sua função (broker, ou BD no modo direto).
+# NÃO inclui o portal: senão um portal lento tirava a ingestão de serviço (cascata).
 @app.get("/saude/pronto")
 @app.get("/health/ready")
 async def ready(response: Response):
-    global pool, broker_conn
-    por_fila = int(os.environ.get("POR_FILA", 1))
-    
     try:
-        if por_fila == 0:
+        if POR_FILA == 0:
             async with pool.acquire() as c:
                 await c.execute("SELECT 1")
-        else:
-            if broker_conn is None or broker_conn.is_closed:
-                raise Exception("Broker fechado")
+        elif broker_conn is None or broker_conn.is_closed:
+            raise RuntimeError("broker fechado")
         return {"estado": "pronto"}
     except Exception:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"detail": "broker indisponivel" if por_fila else "database unavailable"}
+        return {"estado": "indisponivel"}
