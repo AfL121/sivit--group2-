@@ -54,8 +54,10 @@ class InternamentoViewSet(viewsets.ReadOnlyModelViewSet):
                         status=status.HTTP_200_OK)
 
 class DispositivoViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Dispositivo.objects.all()
+    queryset = Dispositivo.objects.select_related("internamento")
     serializer_class = DispositivoSerializer
+    lookup_field = "numero_serie"        # o gateway conhece o nº de série, não o id
+    lookup_value_regex = "[^/]+"
 
 class ReadingViewSet(mixins.CreateModelMixin,
                      mixins.ListModelMixin,
