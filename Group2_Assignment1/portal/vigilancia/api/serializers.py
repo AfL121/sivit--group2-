@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from vigilancia.models import Doente, Internamento, Dispositivo, Leitura
+from drf_spectacular.utils import extend_schema_field
 
 # Os limites vivem num só sítio (services.py): o portal e, mais tarde, os
 # consumidores usam a mesma regra.
@@ -18,9 +19,17 @@ class InternamentoSerializer(serializers.ModelSerializer):
         fields = ["id", "doente", "enfermaria", "cama", "admissao", "alta", "versao"]
 
 class DispositivoSerializer(serializers.ModelSerializer):
+    admission = serializers.SerializerMethodField()
+
     class Meta:
         model = Dispositivo
-        fields = ["numero_serie", "tipo"]
+        fields = ["numero_serie", "tipo", "admission"]
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_admission(self, obj):
+        # Só conta um internamento ATIVO. None = dispositivo sem internamento.
+        i = obj.internamento
+        return i.pk if i is not None and i.alta is None else None
 
 class ReadingSerializer(serializers.ModelSerializer):
     # O gateway conhece o número de série, não o nosso id primário. Nunca expor IDs internos (TP3 - Ex 1).
