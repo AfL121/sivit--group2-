@@ -9,10 +9,23 @@
     th, td { border-bottom: 1px solid #ddd; padding: .4rem .6rem; text-align: left; }
     th { background: #f4f4f4; }
     .nota { color: #666; font-size: .9rem; }
+    .topo { display: flex; justify-content: space-between; align-items: center; }
+    .msg { padding: .6rem 1rem; border-radius: 6px; margin: .5rem 0; }
+    .msg.success { background: #dcfce7; } .msg.error { background: #fee2e2; }
   </style>
 </head>
 <body>
-  <h1>{% block cabecalho %}SIVIT{% endblock %}</h1>
+  <div class="topo">
+    <h1>{% block cabecalho %}SIVIT{% endblock %}</h1>
+    {% if user.is_authenticated %}
+    <form method="post" action="{% url 'logout' %}" style="margin:0">{% csrf_token %}
+      <span class="nota">{{ user.username }} ({{ user.perfil.get_papel_display|default:"sem perfil" }}
+        {{ user.perfil.enfermaria }})</span>
+      <button type="submit">Terminar sessão</button>
+    </form>
+    {% endif %}
+  </div>
+  {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
   {% block conteudo %}{% endblock %}
 </body>
 </html>
