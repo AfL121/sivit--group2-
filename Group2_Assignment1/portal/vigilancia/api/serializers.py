@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from vigilancia.models import Doente, Internamento, Dispositivo, Leitura
+from vigilancia.models import Alarme, Doente, Internamento, Dispositivo, Leitura
 from drf_spectacular.utils import extend_schema_field
 
 # Os limites vivem num só sítio (services.py): o portal e, mais tarde, os
@@ -47,3 +47,17 @@ class ReadingSerializer(serializers.ModelSerializer):
         if not lo <= data["valor"] <= hi:
             raise serializers.ValidationError("valor fora do intervalo plausível")
         return data
+
+class AlarmeSerializer(serializers.ModelSerializer):
+    dispositivo = serializers.SlugRelatedField(slug_field="numero_serie", read_only=True)
+    enfermaria = serializers.CharField(source="internamento.enfermaria",
+                                       read_only=True, allow_null=True)
+    cama = serializers.CharField(source="internamento.cama",
+                                 read_only=True, allow_null=True)
+    reconhecido_por = serializers.SlugRelatedField(slug_field="username", read_only=True)
+
+    class Meta:
+        model = Alarme
+        fields = ["id", "dispositivo", "enfermaria", "cama", "regra", "parametro",
+                  "valor", "mensagem", "estado", "criado_em",
+                  "reconhecido_por", "reconhecido_em"]
