@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}{{ internamento.doente.nome }}{% endblock %}
+{% block cabecalho %}{{ internamento.doente.nome }} · {{ internamento.enfermaria }} {{ internamento.cama }}{% endblock %}
+{% block conteudo %}
+<p><a href="{% url 'painel' %}">← Painel</a></p>
+<h2>Alarmes</h2>
+<table>
+  <tr><th>Quando</th><th>Dispositivo</th><th>Mensagem</th><th>Estado</th><th>Reconhecido por</th></tr>
+  {% for a in alarmes %}
+  <tr><td>{{ a.criado_em|date:"d/m H:i:s" }}</td><td>{{ a.dispositivo.numero_serie }}</td>
+      <td>{{ a.mensagem }}</td><td>{{ a.estado }}</td>
+      <td>{{ a.reconhecido_por.username|default:"—" }}</td></tr>
+  {% empty %}<tr><td colspan="5">Sem alarmes.</td></tr>{% endfor %}
+</table>
+<h2>Últimas leituras</h2>
+<table>
+  <tr><th>Instante</th><th>Dispositivo</th><th>Parâmetro</th><th>Valor</th></tr>
+  {% for l in leituras %}
+  <tr><td>{{ l.instante|date:"d/m H:i:s" }}</td><td>{{ l.dispositivo.numero_serie }}</td>
+      <td>{{ l.parametro }}</td><td>{{ l.valor }} {{ l.unidade }}</td></tr>
+  {% empty %}<tr><td colspan="4">Sem leituras.</td></tr>{% endfor %}
+</table>
+<p class="nota">O gráfico de tendência chega com o agregador (ponto 3).</p>
+{% endblock %}
