@@ -1,0 +1,33 @@
+
+{
+  "SPO2_BAIXA": {
+    "parametro": "SPO2",
+    "operador": "<",
+    "limite": 90,
+    "duracao": 30
+  },
+  "FC_ALTA": {
+    "parametro": "FC",
+    "operador": ">",
+    "limite": 120,
+    "duracao": 0
+  },
+  "FC_BAIXA": {
+    "parametro": "FC",
+    "operador": "<",
+    "limite": 50,
+    "duracao": 0
+  },
+  "TEMP_ALTA": {
+    "parametro": "TEMP",
+    "operador": ">",
+    "limite": 38,
+    "duracao": 0
+  },
+  "FR_ALTA": {
+    "parametro": "FR",
+    "operador": ">",
+    "limite": 25,
+    "duracao": 0
+  }
+}

@@ -101,6 +101,28 @@ class Alarme(models.Model):
         indexes = [models.Index(fields=["estado", "-criado_em"])]
 
 
+class EstadoAlarme(models.Model):
+    dispositivo = models.ForeignKey(
+        Dispositivo,
+        on_delete=models.CASCADE,
+        related_name="estados_alarme"
+    )
+
+    regra = models.CharField(max_length=32)
+
+    inicio_episodio = models.DateTimeField(null=True, blank=True)
+
+    ultimo_instante = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dispositivo", "regra"],
+                name="uniq_estado_alarme"
+            )
+        ]
+
+
 class Auditoria(models.Model):
     utilizador = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
                                    on_delete=models.SET_NULL)
