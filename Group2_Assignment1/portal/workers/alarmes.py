@@ -196,23 +196,41 @@ async def processar_regra(conn, dispositivo, parametro, valor,
         intervalo = (instante - ultimo_instante).total_seconds()
 
 
-        if intervalo > INTERVALO_MAXIMO and condicao_ativa:
-            # Interromper o episódio sem resolver o alarme clínico
-            await conn.execute("""
-                UPDATE vigilancia_estadoalarme
-                SET inicio_episodio = NULL
-                WHERE dispositivo_id = (
-                    SELECT id FROM vigilancia_dispositivo
-                    WHERE numero_serie = $1
-                )
-                AND regra = $2
-                AND ultimo_instante = $3
-            """, dispositivo, nome_regra, ultimo_instante)
 
-            # Manter o último instante anterior à interrupção
-            estado = await obter_estado_alarme(
-                conn, dispositivo, nome_regra
-            )
+        if intervalo > INTERVALO_MAXIMO and condicao_ativa:
+            # Verificar se o episódio já originou um alarme
+            inicio_anterior = estado["inicio_episodio"]
+            alarme_existente = False
+
+            if inicio_anterior is not None:
+                chave = f"{nome_regra}|{dispositivo}|{inicio_anterior.isoformat()}"
+
+                alarme_existente = await conn.fetchval("""
+                    SELECT EXISTS(
+                        SELECT 1
+                        FROM vigilancia_alarme
+                        WHERE chave = $1
+                          AND estado IN ('ATIVO', 'RECONHECIDO')
+                    )
+                """, chave)
+
+            # Só reiniciar episódios que ainda não originaram alarmes
+            if not alarme_existente:
+                await conn.execute("""
+                    UPDATE vigilancia_estadoalarme
+                    SET inicio_episodio = NULL
+                    WHERE dispositivo_id = (
+                        SELECT id
+                        FROM vigilancia_dispositivo
+                        WHERE numero_serie = $1
+                    )
+                    AND regra = $2
+                    AND ultimo_instante = $3
+                """, dispositivo, nome_regra, ultimo_instante)
+
+                estado = await obter_estado_alarme(
+                    conn, dispositivo, nome_regra
+                )
 
 
     if condicao_ativa:
@@ -321,9 +339,16 @@ async def process_message(message: aio_pika.IncomingMessage, pool, ack_automatic
     
     try:
         corpo = json.loads(message.body.decode())
-    except Exception:
+
+        if not isinstance(corpo, dict):
+            raise ValueError("A mensagem deve ser um objeto JSON")
+
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+        print(f"Mensagem JSON inválida: {e}", flush=True)
+
         if not ack_automatico:
             await message.reject(requeue=False)
+
         return
 
     # Extrair os dados da leitura recebida
@@ -373,6 +398,11 @@ async def process_message(message: aio_pika.IncomingMessage, pool, ack_automatic
 
         regras_parametro = obter_regras_parametro(parametro, regras)
 
+        if not regras_parametro:
+            if not ack_automatico:
+                await message.ack()
+            return
+        
         async with pool.acquire() as conn:
             async with conn.transaction():
 
@@ -419,10 +449,16 @@ async def process_message(message: aio_pika.IncomingMessage, pool, ack_automatic
             "id": message.message_id
         }), flush=True)
 
-    except (asyncpg.PostgresConnectionError, OSError) as e:
+    except (
+    asyncpg.PostgresConnectionError,
+    asyncpg.DeadlockDetectedError,
+    asyncpg.SerializationError,
+    OSError
+        ) as e:
         print(f"ERRO TEMPORARIO NA BD: {e}", flush=True)
 
         if not ack_automatico:
+            await asyncio.sleep(2)
             await message.nack(requeue=True)
 
     except Exception as e:
@@ -443,7 +479,19 @@ async def main():
     max_mensagens = int(os.environ.get("MAX_MENSAGENS", 100000))
     politica_cheia = os.environ.get("POLITICA_CHEIA", "reject-publish")
 
-    pool = await asyncpg.create_pool(db_url)
+    while True:
+        try:
+            pool = await asyncpg.create_pool(db_url)
+            print("Ligação ao PostgreSQL estabelecida", flush=True)
+            break
+
+        except (asyncpg.PostgresConnectionError, OSError) as e:
+            print(
+                f"PostgreSQL indisponível: {e}. "
+                "Nova tentativa em 5 segundos...",
+                flush=True
+            )
+            await asyncio.sleep(5)
     connection = await aio_pika.connect_robust(amqp_url)
     channel = await connection.channel()
     await channel.set_qos(prefetch_count=prefetch)

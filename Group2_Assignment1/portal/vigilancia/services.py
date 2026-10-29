@@ -171,18 +171,33 @@ def reconhecer_alarme(alarme_id, user, ip=None):
     if enfermaria != p.enfermaria:
         raise PermissionDenied("alarme de outra enfermaria")
 
-    n = (Alarme.objects.filter(pk=alarme.pk, reconhecido_por__isnull=True)
-         .update(estado=Alarme.RECONHECIDO, reconhecido_por=user,
-                 reconhecido_em=timezone.now()))
+
+    n = (Alarme.objects.filter(
+            pk=alarme.pk,
+            estado=Alarme.ATIVO,
+            reconhecido_por__isnull=True
+         )
+         .update(
+             estado=Alarme.RECONHECIDO,
+             reconhecido_por=user,
+             reconhecido_em=timezone.now()
+         ))
+
     alarme = _carregar_alarme(alarme.pk)
     if n == 1:
         auditar(user, "RECONHECER_ALARME", ip=ip,
                 doentes=[alarme.internamento.doente.codigo],
                 detalhe=f"alarme {alarme.pk} ({alarme.regra})")
         return alarme, True
+
+    if alarme.estado == Alarme.RESOLVIDO:
+        raise PermissionDenied("não é possível reconhecer um alarme resolvido")
+
     if alarme.reconhecido_por_id == user.id:
         return alarme, False
+
     raise AlarmeJaReconhecido(alarme.reconhecido_por)
+
 
 
 # ----------------------------------------------------------------- auditoria

@@ -95,6 +95,7 @@ services:
     environment: *ambiente_worker
     depends_on:
       broker: { condition: service_healthy }
+      sivitDB: { condition: service_healthy }
 
   worker_painel:
     build: ./workers
