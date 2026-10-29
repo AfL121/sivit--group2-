@@ -6,7 +6,6 @@ from .models import (Alarme, Auditoria, Dispositivo, Doente, Internamento,
 admin.site.register([Doente, Internamento, Dispositivo, Leitura, Perfil, Alarme])
 
 
-admin.site.register(Auditoria, AuditoriaAdmin)
 class AuditoriaAdmin(admin.ModelAdmin):
     list_display = ("instante", "utilizador", "acao", "doente_codigo", "ip")
     list_filter = ("acao",)
@@ -20,3 +19,5 @@ class AuditoriaAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+admin.site.register(Auditoria, AuditoriaAdmin)
