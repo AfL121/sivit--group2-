@@ -1,8 +1,8 @@
-from functools import wraps
+
 
 from django.db import IntegrityError, transaction
 from rest_framework import mixins, status, viewsets
-from rest_framework.decorators import action
+
 from rest_framework.response import Response
 
 from vigilancia import services
@@ -12,28 +12,18 @@ from .serializers import (AlarmeSerializer, DispositivoSerializer, DoenteSeriali
                           InternamentoSerializer, ReadingSerializer)
 
 
-def idempotent_action(view_func):
-    @wraps(view_func)
-    def wrapper(self, request, *args, **kwargs):
-        key = request.headers.get("Idempotency-Key")
+def resposta_guardada(chave):
+    """Devolve a resposta guardada para esta chave, ou None se ainda não existe."""
+    if not chave:
+        return None
+    guardada = IdempotencyKey.objects.filter(key=chave).first()
+    return guardada.response if guardada else None
 
-        if not key:
-            return view_func(self, request, *args, **kwargs)
 
-        # 1. Procurar a chave; se presente, retornar a resposta armazenada
-        if IdempotencyKey.objects.filter(key=key).exists():
-            stored = IdempotencyKey.objects.get(key=key)
-            return Response(stored.response)
-
-        # 2. Se não, executar e armazenar dentro da mesma transação
-        with transaction.atomic():
-            response = view_func(self, request, *args, **kwargs)
-
-            if 200 <= response.status_code < 300:
-                IdempotencyKey.objects.create(key=key, response=response.data)
-            return response
-
-    return wrapper
+def guardar_resposta(chave, resposta):
+    """Guarda a resposta (só se correu bem) para repetir o mesmo resultado num reenvio."""
+    if chave and 200 <= resposta.status_code < 300:
+        IdempotencyKey.objects.create(key=chave, response=resposta.data)
 
 
 class DoenteViewSet(viewsets.ReadOnlyModelViewSet):
@@ -51,13 +41,20 @@ class InternamentoViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return services.internamentos_acessiveis(self.request.user)
 
-    @action(detail=True, methods=["post"])
-    @idempotent_action
-    def terminar(self, request, pk=None):
-        internamento = services.dar_alta(self.get_object().pk)
-        return Response({"status": "Internamento terminado com sucesso",
-                         "alta": internamento.alta.isoformat()},
-                        status=status.HTTP_200_OK)
+       def terminar(self, request, pk=None):
+        chave = request.headers.get("Idempotency-Key")
+        guardada = resposta_guardada(chave)
+        if guardada is not None:
+            return Response(guardada)
+
+        # Executar e guardar a resposta na MESMA transação.
+        with transaction.atomic():
+            internamento = services.dar_alta(self.get_object().pk)
+            resposta = Response({"status": "Internamento terminado com sucesso",
+                                 "alta": internamento.alta.isoformat()},
+                                status=status.HTTP_200_OK)
+            guardar_resposta(chave, resposta)
+        return resposta
 
 
 class DispositivoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -98,16 +95,22 @@ class AlarmeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
     def get_queryset(self):
         return services.alarmes_visiveis(self.request.user).order_by("-criado_em")
 
-    @action(detail=True, methods=["post"])
-    @idempotent_action
-    def reconhecer(self, request, pk=None):
+        def reconhecer(self, request, pk=None):
+        chave = request.headers.get("Idempotency-Key")
+        guardada = resposta_guardada(chave)
+        if guardada is not None:
+            return Response(guardada)
+
         self.get_object()                    # 404 se o alarme não for visível a este utilizador
-        try:
-            alarme, _ = services.reconhecer_alarme(
-                pk, request.user, ip=services.ip_do_pedido(request))
-        except services.AlarmeJaReconhecido as e:
-            return Response(
-                {"detail": f"alarme já reconhecido por {getattr(e.por, 'username', '?')}"},
-                status=status.HTTP_409_CONFLICT)
-        # PermissionDenied (médico, outra enfermaria) propaga-se e o DRF converte em 403.
-        return Response(AlarmeSerializer(alarme).data, status=status.HTTP_200_OK)
+        with transaction.atomic():
+            try:
+                alarme, _ = services.reconhecer_alarme(
+                    pk, request.user, ip=services.ip_do_pedido(request))
+            except services.AlarmeJaReconhecido as e:
+                return Response(
+                    {"detail": f"alarme já reconhecido por {getattr(e.por, 'username', '?')}"},
+                    status=status.HTTP_409_CONFLICT)
+            # PermissionDenied (médico, outra enfermaria) propaga-se e o DRF converte em 403.
+            resposta = Response(AlarmeSerializer(alarme).data, status=status.HTTP_200_OK)
+            guardar_resposta(chave, resposta)
+        return resposta
