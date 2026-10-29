@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from vigilancia.models import Alarme, Doente, Internamento, Dispositivo, Leitura
-from drf_spectacular.utils import extend_schema_field
 
 # Os limites vivem num só sítio (services.py): o portal e, mais tarde, os
 # consumidores usam a mesma regra.
@@ -25,7 +24,7 @@ class DispositivoSerializer(serializers.ModelSerializer):
         model = Dispositivo
         fields = ["numero_serie", "tipo", "admission"]
 
-    @extend_schema_field(serializers.IntegerField(allow_null=True))
+   
     def get_admission(self, obj):
         # Só conta um internamento ATIVO. None = dispositivo sem internamento.
         i = obj.internamento
