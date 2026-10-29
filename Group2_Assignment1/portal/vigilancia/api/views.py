@@ -94,7 +94,7 @@ class AlarmeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
     def get_queryset(self):
         return services.alarmes_visiveis(self.request.user).order_by("-criado_em")
 
-        def reconhecer(self, request, pk=None):
+    def reconhecer(self, request, pk=None):
         chave = request.headers.get("Idempotency-Key")
         guardada = resposta_guardada(chave)
         if guardada is not None:
