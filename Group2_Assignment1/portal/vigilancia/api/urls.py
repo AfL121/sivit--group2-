@@ -15,6 +15,9 @@ router.register(r"alarms", AlarmeViewSet, basename="alarm")
 
 urlpatterns = [
     path("v1/auth/token/", obtain_auth_token),      # utilizador+password -> token
+        # Operações que não são "ver/criar/apagar": ligamos o método POST à função certa.
+    path("v1/admissions/<int:pk>/terminar/", InternamentoViewSet.as_view({"post": "terminar"})),
+    path("v1/alarms/<int:pk>/reconhecer/", AlarmeViewSet.as_view({"post": "reconhecer"})),
     path("v1/", include(router.urls)),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("schema/swagger-ui/", SpectacularSwaggerView.as_view(url_name="schema"),
