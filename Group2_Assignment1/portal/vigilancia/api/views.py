@@ -41,7 +41,7 @@ class InternamentoViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return services.internamentos_acessiveis(self.request.user)
 
-       def terminar(self, request, pk=None):
+    def terminar(self, request, pk=None):
         chave = request.headers.get("Idempotency-Key")
         guardada = resposta_guardada(chave)
         if guardada is not None:
@@ -55,7 +55,6 @@ class InternamentoViewSet(viewsets.ReadOnlyModelViewSet):
                                 status=status.HTTP_200_OK)
             guardar_resposta(chave, resposta)
         return resposta
-
 
 class DispositivoViewSet(viewsets.ReadOnlyModelViewSet):
     # A ingestão (conta de serviço, sem perfil) consulta este endpoint por nº de série.
