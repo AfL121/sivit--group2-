@@ -5,7 +5,6 @@ import logging
 import os
 import random
 import time
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import aio_pika
@@ -63,8 +62,8 @@ _aberto_ate = 0.0
 _cache: dict[str, float] = {}
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+async def iniciar():
+    """Corre uma vez quando o serviço arranca: abre as ligações."""
     global pool, broker_conn, exchange, cliente_portal
     if not GATEWAY_TOKENS:
         log.warning("GATEWAY_TOKENS vazio: todos os pedidos serão recusados (401)")
@@ -82,13 +81,17 @@ async def lifespan(app: FastAPI):
         # nível "sincrona" = SEM timeout, para reproduzir a falha em cascata
         timeout=None if NIVEL == 1 else TIMEOUT_S,
     )
-    yield
+
+async def terminar():
+    """Corre uma vez quando o serviço para: fecha as ligações."""
     await cliente_portal.aclose()
     await pool.close()
     await broker_conn.close()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
+app.add_event_handler("startup", iniciar)
+app.add_event_handler("shutdown", terminar)
 
 
 # ------------------------------------------------------------------ autenticação do gateway (RF2)
@@ -170,7 +173,6 @@ async def publish(r: Reading, nao_validado: bool = False):
     await exchange.publish(mensagem, routing_key=f"leitura.{r.parametro.lower()}.{r.dispositivo}")
 
 
-@app.post("/v1/leituras", status_code=202, dependencies=[Depends(autenticar)])
 async def ingest(batch: list[Reading]):
     if not batch:
         return {"received": 0, "accepted": 0, "rejected": 0}
@@ -215,16 +217,12 @@ async def ingest(batch: list[Reading]):
 
 # ------------------------------------------------------------------ saúde (RF2)
 # vivo: o processo responde. Não depende de nada: se falhar, reinicia-se.
-@app.get("/saude/vivo")
-@app.get("/health/live")
 def live():
     return {"estado": "vivo"}
 
 
 # pronto: consegue cumprir a sua função (broker, ou BD no modo direto).
 # NÃO inclui o portal: senão um portal lento tirava a ingestão de serviço (cascata).
-@app.get("/saude/pronto")
-@app.get("/health/ready")
 async def ready(response: Response):
     try:
         if POR_FILA == 0:
@@ -236,3 +234,12 @@ async def ready(response: Response):
     except Exception:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {"estado": "indisponivel"}
+
+
+# Cada linha liga uma morada (URL) a uma função.
+app.add_api_route("/v1/leituras", ingest, methods=["POST"], status_code=202,
+                  dependencies=[Depends(autenticar)])
+app.add_api_route("/saude/vivo", live, methods=["GET"])
+app.add_api_route("/health/live", live, methods=["GET"])
+app.add_api_route("/saude/pronto", ready, methods=["GET"])
+app.add_api_route("/health/ready", ready, methods=["GET"])
